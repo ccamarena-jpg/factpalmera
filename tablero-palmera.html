@@ -1,0 +1,513 @@
+<title>Tablero Palmera</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: cabecera negra como la web de Palmera, navegación Ventas / Márgenes, filtros fijos y tablas sobrias de esquinas pequeñas. Marca: naranja #F76300, amarillo #FED402, negro #1A1A1A, Outfit. */
+:root{
+  --bg:#F2F2F2; --surface:#FFFFFF; --ink:#1A1A1A; --muted:#5E5E5E; --line:#D9D9D9;
+  --palm:#F76300; --palm-ink:#FFFFFF; --sun:#FED402; --sun-bg:#FFF4B8;
+  --bad:#C8102E; --bad-bg:#FDE6E9; --ok:#1B7F4B; --ok-bg:#E0F2E7; --warn:#A04A00; --warn-bg:#FFE9D6;
+  --hdr:#1A1A1A; --hdr-ink:#FFFFFF; --cost:#404040;
+  --font-display:"Outfit","Segoe UI",system-ui,sans-serif;
+  --font-body:"Outfit","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111111; --surface:#1C1C1C; --ink:#F2F2F2; --muted:#A5A5A5; --line:#333333;
+  --palm:#FF761B; --palm-ink:#1A1A1A; --sun:#FED402; --sun-bg:#3B3200;
+  --bad:#FF6B7D; --bad-bg:#3E141B; --ok:#4FCB8B; --ok-bg:#12301F; --warn:#FFA45C; --warn-bg:#3A2410;
+  --hdr:#000000; --hdr-ink:#FFFFFF; --cost:#9A9A9A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111111; --surface:#1C1C1C; --ink:#F2F2F2; --muted:#A5A5A5; --line:#333333;
+  --palm:#FF761B; --palm-ink:#1A1A1A; --sun:#FED402; --sun-bg:#3B3200;
+  --bad:#FF6B7D; --bad-bg:#3E141B; --ok:#4FCB8B; --ok-bg:#12301F; --warn:#FFA45C; --warn-bg:#3A2410;
+  --hdr:#000000; --hdr-ink:#FFFFFF; --cost:#9A9A9A; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.45;padding-inline:16px;padding-block:0 40px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance}
+.num{font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--palm);outline-offset:2px}
+
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding-block:20px 4px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.sun{width:38px;height:38px;border-radius:50%;background:var(--sun);display:grid;place-items:center;flex:none}
+.sun svg{width:24px;height:24px}
+.brand h1{font-size:1.55rem;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.brand small{display:block;color:var(--muted);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+.src{display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.dot.live{background:var(--ok)} .dot.err{background:var(--bad)} .dot.load{background:var(--sun)}
+.srcmsg{color:var(--muted);font-size:.82rem;min-width:0}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;font-weight:500}
+.btn:hover{border-color:var(--palm)}
+.btn.primary{background:var(--palm);color:var(--palm-ink);border-color:var(--palm)}
+
+.filters{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f>label,.f>.lbl{font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.f input,.f select,.ms>summary{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;min-height:34px}
+.f input[type=search]{width:150px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 12px;font-size:.85rem;font-weight:500}
+.chip[aria-pressed=true]{background:var(--palm);border-color:var(--palm);color:var(--palm-ink)}
+.ms{position:relative}
+.ms>summary{list-style:none;cursor:pointer;min-width:190px;display:flex;justify-content:space-between;gap:8px}
+.ms>summary::-webkit-details-marker{display:none}
+.ms .pop{position:absolute;z-index:10;top:calc(100% + 4px);left:0;width:min(380px,86vw);max-height:300px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.ms .pop label{display:flex;gap:8px;align-items:flex-start;padding:5px 6px;border-radius:6px;font-size:.85rem}
+.ms .pop label:hover{background:var(--bg)}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.kpi .l{font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.kpi .v{font-family:var(--font-display);font-size:1.7rem;font-weight:800;letter-spacing:-.02em;line-height:1.15;margin-top:4px;overflow-wrap:anywhere}
+.kpi .s{color:var(--muted);font-size:.8rem;margin-top:2px}
+.kpi.bad{background:var(--bad-bg);border-color:var(--bad)} .kpi.bad .v,.kpi.bad .l{color:var(--bad)}
+.kpi.main{background:var(--palm);border-color:var(--palm);color:var(--palm-ink)} .kpi.main .l,.kpi.main .s{color:var(--palm-ink);opacity:.85}
+
+.cols{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px}
+@media(max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0}
+.card h2{font-size:1.05rem;margin-bottom:10px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--muted);font-size:.8rem;margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.tablewrap{overflow-x:auto;min-width:0}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;font-weight:700;background:var(--surface)}
+th.sortable{cursor:pointer} th.sortable:hover{color:var(--ink)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.r,th.r{text-align:right}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--bg)}
+tr.bad td{background:var(--bad-bg);color:var(--bad)} tr.bad td .sub{color:var(--bad);opacity:.8}
+tr.bad:hover td{background:var(--bad-bg)}
+tr.child td{background:var(--bg);font-size:.82rem;padding-block:5px}
+tr.child td:first-child{padding-left:28px}
+.sub{display:block;color:var(--muted);font-size:.76rem}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.76rem;font-weight:700;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.bad{background:var(--bad);color:#fff}
+.pill.prog{background:var(--sun-bg);color:var(--warn)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.off{background:var(--bg);color:var(--muted)}
+.bar{height:8px;border-radius:4px;background:var(--palm);min-width:2px}
+.barcell{display:flex;align-items:center;gap:8px;min-width:130px}
+.barcell .bar{flex:none}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;padding:10px 16px;font-weight:700;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--sun)}
+.note{background:var(--sun-bg);color:var(--ink);border-radius:8px;padding:8px 12px;font-size:.84rem}
+.empty{padding:32px 16px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--ink);font-family:var(--font-display);font-size:1.15rem;margin-bottom:6px}
+details.dq summary{cursor:pointer;font-weight:700}
+details.dq ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:.84rem}
+.head{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;margin-bottom:10px}
+svg text{fill:var(--muted);font-family:var(--font-body);font-size:11px}
+@media(prefers-reduced-motion:no-preference){.bar{transition:width .3s}}
+
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.top{background:var(--hdr);color:var(--hdr-ink);border-radius:8px;padding:16px 20px;margin-top:16px;border-bottom:4px solid var(--palm)}
+.brand h1{font-weight:700;font-size:1.4rem;letter-spacing:-.01em;color:var(--hdr-ink)}
+.brand small{color:#BDBDBD}
+.brand .sun{background:var(--sun)}
+.top .srcmsg{color:#BDBDBD}
+.top .btn{background:transparent;color:var(--hdr-ink);border-color:#555;border-radius:5px}
+.top .btn:hover{border-color:var(--palm)}
+.top .btn.primary{background:var(--palm);border-color:var(--palm);color:#fff;font-weight:700}
+.btn{border-radius:5px}
+.nav{display:flex;gap:6px;flex-wrap:wrap}
+.nav button{border:2px solid #555;background:transparent;color:var(--hdr-ink);border-radius:5px;padding:7px 18px;font-weight:700}
+.nav button[aria-pressed=true]{background:var(--palm);border-color:var(--palm);color:#fff}
+.chip{border-radius:5px} .card,.kpi,.filters{border-radius:8px}
+.kpi.main .v,.kpi.main .l,.kpi.main .s{color:var(--palm-ink)}
+.chip[aria-pressed=true],.btn.primary{color:var(--palm-ink)}
+.top .btn.primary{color:#fff}
+.tab[aria-selected=true]{border-bottom-color:var(--palm)}
+th{color:var(--ink);opacity:.7}
+.stackbar{display:flex;height:26px;border-radius:5px;overflow:hidden;background:var(--bg);min-width:200px}
+.stackbar span{display:grid;place-items:center;font-size:.72rem;font-weight:700;white-space:nowrap;overflow:hidden}
+.sb-cost{background:var(--cost);color:#fff} .sb-tt{background:var(--sun);color:#1A1A1A} .sb-mg{background:var(--palm);color:var(--palm-ink)}
+.neg{color:var(--bad);font-weight:700}
+tr.grp td{background:var(--bg);font-weight:700;border-bottom:2px solid var(--palm)}
+.logo{height:46px;width:auto;flex:none;display:block}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <canvas id="logo" class="logo" width="274" height="100" role="img" aria-label="Palmera"></canvas>
+      <div><h1>Márgenes</h1></div>
+    </div>
+    <nav class="nav" id="nav" aria-label="Vista" hidden><button type="button" data-p="ventas" aria-pressed="true">Ventas</button><button type="button" data-p="margen" aria-pressed="false">Márgenes</button></nav>
+    <div class="src">
+      <span class="dot load" id="dot"></span><span class="srcmsg" id="srcmsg">Conectando con Excel…</span>
+      <button class="btn primary" id="btnRefresh" type="button">Actualizar</button>
+      <button class="btn" id="btnUpload" type="button">Cargar .xlsx</button>
+      <button class="btn" id="btnCsv" type="button">Exportar CSV</button>
+      <input type="file" id="file" accept=".xlsx" hidden>
+    </div>
+  </header>
+
+  <section class="filters" aria-label="Filtros">
+    <div class="f"><label for="fFrom">Desde</label><input type="date" id="fFrom"></div>
+    <div class="f"><label for="fTo">Hasta</label><input type="date" id="fTo"></div>
+    <div class="f"><label for="fBase">Fecha según</label><select id="fBase"><option value="emi">Emisión de la OS</option><option value="ent">Entrega</option><option value="fac">Emisión de la factura</option></select></div>
+    <div class="f"><span class="lbl">Mes</span><div class="chips" id="months"></div></div>
+    <div class="f"><span class="lbl">Cadena</span><div class="chips" id="chains"></div></div>
+    <div class="f"><span class="lbl">SKU</span>
+      <details class="ms" id="skuMs"><summary><span id="skuSum">Todos los SKUs</span><span aria-hidden="true">▾</span></summary><div class="pop" id="skuPop"></div></details></div>
+    <div class="f"><label for="fEstado">Estado</label><select id="fEstado"><option value="">Todos</option><option value="ok">Atendidas</option><option value="bad">Con falta de stock</option><option value="prog">Proyectadas</option><option value="other">Otros</option></select></div>
+    <div class="f"><label for="fQ">Buscar O/C</label><input type="search" id="fQ" placeholder="N° de O/C"></div>
+    <button class="btn" id="btnClear" type="button">Limpiar</button>
+  </section>
+
+  <div id="viewVentas" class="stack">
+  <section class="kpis" id="kpis" aria-live="polite"></section>
+
+  <section class="cols">
+    <div class="card"><h2>OS emitidas por cadena</h2><div class="tablewrap" id="chainTbl"></div></div>
+    <div class="card"><h2>Venta por mes de emisión</h2><div id="monthChart"></div>
+      <div class="legend"><span><i style="background:var(--palm)"></i>Atendida</span><span><i style="background:var(--sun)"></i>Proyectada</span><span><i style="background:var(--bad)"></i>Falta de stock</span></div></div>
+  </section>
+
+  <section class="card" style="padding:0 14px 14px">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tabOs" aria-selected="true" type="button">Órdenes (OS)</button>
+      <button class="tab" role="tab" id="tabSku" aria-selected="false" type="button">Detalle por SKU</button>
+    </div>
+    <div id="panel" style="padding-top:12px"></div>
+  </section>
+
+  <section class="card"><details class="dq" id="dq"></details></section>
+  <p class="srcmsg" style="margin:0">Montos en soles, sin IGV. Ventas se calcula con la hoja CONSOLIDADO. En rojo: OS con ATENCIÓN = DESESTIMADO, ON GOING o TBD, es decir, OS donde algunos SKUs no se atendieron por falta de stock (el monto es el de la OS completa). El detalle por SKU y los márgenes salen de la hoja FACTURA.</p>
+  </div>
+  <div id="viewMargen" class="stack" hidden></div>
+</div>
+
+<script>
+const SRC={server:'Microsoft 365',tool:'read_resource',name:'Facturación_Palmera_SEP.xlsx',
+  uri:'file:///b!ftpx1PHMU02Xyd_BvRi5gZ4jKtzFMjZHt1vZTICVWd0sPgcGYMRfTZopqpx_5vTB/015HP6ULO5SPMQ35H4ZVCKWQ2QXIQSSAVA'};
+const IGV=1.18, MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const $=id=>document.getElementById(id);
+/* logo Palmera en blanco, sin fondo (máscara codificada por filas) */
+(function(){const c=$('logo'),x=c.getContext('2d');x.fillStyle='#fff';
+ '2m,6,4u/2i,c,t,4,3v/2g,f,p,8,3u/1g,c,n,h,n,b,3s/1d,i,j,j,k,e,3r/1b,m,h,j,k,f,3q/19,p,g,k,i,h,f,9,31/18,s,e,k,i,i,d,d,2y/17,u,d,l,g,j,c,f,2x/16,w,c,l,g,k,a,i,2v/16,x,b,l,g,l,8,k,2u/16,y,a,m,f,m,7,k,2u/15,z,a,m,f,m,6,m,2t/15,10,9,m,f,n,5,n,c,3,2d/15,11,9,l,f,n,5,n,a,8,2a/15,11,9,m,e,o,3,o,9,c,27/15,12,8,m,e,p,2,p,8,e,25/15,13,8,l,e,p,2,p,7,i,22/15,13,8,l,e,1g,7,l,1z/15,14,7,m,e,1f,6,o,1x/15,i,1,m,7,l,e,1f,6,q,1v/15,i,2,l,7,l,e,1f,5,s,1u/e,7,k,i,3,l,6,l,e,1f,5,t,1t/b,e,g,i,4,k,7,k,e,1f,5,u,1s/9,i,e,i,4,l,6,l,d,1f,4,v,1s/8,k,e,i,4,l,5,l,d,1f,4,v,1s/7,n,c,i,5,k,6,k,d,1e,5,v,7,5,1g/6,p,b,j,4,l,5,k,d,1e,4,v,6,c,1b/5,s,9,j,5,k,5,k,d,1e,4,k,3,7,6,g,18/4,u,9,j,4,l,5,k,d,1d,4,k,f,j,16/3,w,8,j,5,k,5,k,d,1d,3,k,g,l,14/2,y,7,k,5,k,5,j,d,1d,3,k,f,o,12/2,z,6,k,5,k,5,j,d,1c,4,j,g,p,11/1,11,6,j,6,k,4,j,d,1c,4,k,e,r,10/1,11,6,k,5,k,5,i,d,g,1,v,3,q,9,s,z/0,13,5,k,5,l,4,j,c,g,2,u,3,s,7,t,y/0,14,5,k,5,k,4,j,c,g,2,u,3,t,5,v,x/0,15,4,k,5,l,4,i,d,g,1,e,1,f,3,t,5,v,x/1,14,5,k,5,k,4,i,d,g,1,e,1,f,2,v,3,x,w/1,15,4,k,5,k,4,j,4,3,5,g,2,c,2,f,2,v,3,f,2,g,w/1,15,4,k,5,l,4,i,1,8,3,g,2,c,2,e,3,u,4,f,3,f,w/2,15,4,k,5,k,4,r,3,g,2,c,2,e,3,u,3,f,4,f,w/2,h,4,k,4,k,4,m,4,r,3,f,3,a,3,e,3,t,4,f,5,e,w/3,g,6,j,4,k,2,n,4,s,2,g,2,a,2,f,3,s,4,f,6,e,w/3,h,6,i,4,19,4,s,2,g,3,9,2,f,2,j,3,5,6,f,6,e,w/3,i,6,i,4,19,4,r,3,f,3,8,3,f,2,j,e,f,5,f,w/4,h,6,i,4,19,4,s,2,f,3,8,3,f,2,i,e,f,4,h,w/4,i,5,i,5,19,3,s,2,f,4,6,4,f,2,i,e,10,w/5,i,5,i,4,19,4,r,3,e,5,4,5,f,2,i,e,z,x/6,h,5,i,5,18,4,r,3,e,7,1,6,f,2,k,b,10,b,8,e/6,i,4,i,5,19,4,q,4,d,e,e,3,m,9,z,a,c,c/7,i,4,h,6,18,4,q,4,d,e,e,3,n,8,z,8,f,b/7,i,4,i,5,18,5,p,5,c,e,e,4,n,6,z,8,i,9/8,i,3,i,6,18,5,o,6,a,g,d,4,n,6,x,8,l,8/9,i,2,i,6,18,5,o,6,a,g,d,5,l,7,w,8,n,7/9,j,1,i,7,17,6,n,8,7,i,b,6,l,6,t,b,p,6/a,i,1,i,7,17,7,l,a,4,l,9,8,j,7,t,b,q,5/b,10,8,17,7,j,12,3,e,g,8,t,a,s,4/b,10,9,16,8,h,1m,c,a,t,9,u,3/c,z,9,p,1,g,9,f,1q,6,d,t,9,u,3/d,y,a,n,3,f,b,b,2b,e,1,f,7,j,1,c,2/d,y,a,l,6,e,d,5,2g,d,2,e,6,j,2,c,2/e,w,c,j,7,e,2z,b,3,e,6,i,3,d,1/f,v,c,k,7,d,31,8,5,d,5,j,3,d,1/f,v,d,k,6,c,35,4,6,e,4,i,4,d,1/g,t,f,j,7,a,3g,e,3,j,3,f/h,s,f,k,8,7,3i,d,3,i,4,f/h,r,h,j,9,4,3l,b,3,i,4,g/i,q,i,i,3y,a,4,i,4,g/j,o,j,j,3z,6,5,i,4,h/j,o,k,i,4a,j,3,g,1/k,m,m,h,4a,12,1/l,l,n,g,49,13,1/l,l,n,g,49,13,1/m,k,o,f,49,12,2/n,j,p,e,49,12,2/o,j,p,d,49,12,2/o,k,q,a,4b,11,2/p,k,q,8,4c,d,2,l,3/q,k,r,3,4g,c,4,j,3/q,l,5b,9,6,i,3/r,k,5c,7,7,h,4/s,k,5e,2,8,i,4/t,k,5n,h,5/u,k,5m,g,6/u,k,5n,f,6/v,k,5m,e,7/w,j,5n,c,8/x,j,5n,a,9/y,i,5p,7,a/z,h,5r,4,b/10,h,65/10,h,65/11,g,65/12,f,65/13,d,66/14,c,66/15,a,67/16,9,67/18,5,69'.split('/').forEach((row,y)=>{let px=0,on=false;row.split(',').forEach(t=>{const n=parseInt(t,36);if(on)x.fillRect(px,y,n,1);px+=n;on=!on})})})();
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=(n,d=0)=>'S/ '+(n||0).toLocaleString('es-ES',{useGrouping:'always',minimumFractionDigits:d,maximumFractionDigits:d});
+const fint=n=>(n||0).toLocaleString('es-ES',{useGrouping:'always'});
+let DATA={orders:[],lines:[]}, F={from:'',to:'',base:SHOW_VENTAS?'emi':'fac',chains:new Set(),skus:new Set(),estado:'',q:''};
+/* Vista Ventas oculta por ahora: poner SHOW_VENTAS=true para retomarla */
+const SHOW_VENTAS=false;
+let page=SHOW_VENTAS?'ventas':'margen', view='os', sort={k:'emi',d:-1}, expanded=new Set(), meta={at:null,state:'load',msg:'Conectando con Excel…'};
+
+/* ---------- lectura ---------- */
+function parseText(txt){
+  const out={};let cur=null,inF=false;
+  for(const line of txt.split(/\r?\n/)){
+    const m=line.match(/^## Sheet:\s*(.*)$/);
+    if(m){cur=m[1].split(' — ')[0].replace(/\s*\(empty\)\s*$/,'').trim();out[cur]=[];inF=false;continue}
+    if(!cur)continue;
+    if(/^Formulas:/.test(line)){inF=true;continue}
+    if(inF||!line.trim())continue;
+    out[cur].push(line.split('\t'));
+  }
+  return out;
+}
+function toObjs(rows){
+  const hi=rows.findIndex(r=>r.some(c=>String(c??'').trim().toUpperCase()==='NRO O/C'));
+  if(hi<0)return[];
+  const h=rows[hi].map(c=>String(c??'').trim().toUpperCase());
+  return rows.slice(hi+1).map(r=>{const o={};h.forEach((k,i)=>{if(k&&!(k in o))o[k]=r[i]});return o})
+    .filter(o=>/\d/.test(String(o['NRO O/C']??'')));
+}
+function num(v){
+  if(typeof v==='number')return v;
+  if(v==null)return null;
+  let s=String(v).replace(/[^\d,.\-]/g,'');
+  if(!s)return null;
+  if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+  const n=parseFloat(s);return isNaN(n)?null:n;
+}
+function iso(v){
+  if(v==null||v==='')return null;
+  if(v instanceof Date){const d=new Date(v.getTime()+12*36e5);return d.toISOString().slice(0,10)}
+  if(typeof v==='number'){return new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10)}
+  const m=String(v).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:null;
+}
+const T=v=>String(v??'').trim();
+function build(sheets){
+  const get=n=>{const k=Object.keys(sheets).find(x=>x.trim().toUpperCase()===n);return k?toObjs(sheets[k]):[]};
+  const cons=get('CONSOLIDADO'),fac=get('FACTURA');
+  const orders=cons.map(o=>{
+    const at=T(o['ATENCION']).toUpperCase();
+    const fn=T(o['FACTURA2']);
+    return{oc:T(o['NRO O/C']),at,est:at==='ATENDIDO'?'ok':(at==='DESESTIMADO'||at==='ON GOING'||at==='TBD')?'bad':at==='PROYECTADO'?'prog':'other',
+      chain:T(o['CANAL']).toUpperCase()||'SIN CANAL',det:T(o['DETALLE CANAL']),
+      fact:/^F\d/i.test(fn)?fn:'',pago:['PAGADO','VENCIDO','PENDIENTE'].includes(T(o['PAGADO O VENCIDO']).toUpperCase())?T(o['PAGADO O VENCIDO']).toUpperCase():'',
+      monto:num(o[Object.keys(o).find(k=>/^TOTAL \$/.test(k))])||0,units:num(o['TOTAL UNIDADES']),emi:iso(o['FEC. EMISION']),ent:iso(o['FEC. ENTREGA']),venc:iso(o['FEC. VENCIMTO.']),fac:null,lines:[]}
+  });
+  const map=new Map(orders.map(o=>[o.oc,o]));
+  const lines=fac.map(l=>{
+    const oc=T(l['NRO O/C']),tot=num(l['TOTAL + IGV'])||0;
+    const qty=num(l['CANTIDAD'])||0,pv=num(l['PRECIO DE VENTA']),cp=num(l['COSTO DEL PRODUCTO'])||0,ctt=num(l['COSTO TTA'])||0,mxr=num(l['MARGEN RETAIL']);
+    const L={oc,sku:T(l['PRODUCTO']),qty,pv,cp,ctt,mx:mxr!=null?mxr:((pv||0)-ctt)*qty,ft:num(l['FACTURACIÓN TOTAL'])!=null?num(l['FACTURACIÓN TOTAL']):(pv||0)*qty,venta:tot/IGV,order:map.get(oc)||null};
+    L.fac=iso(l['FECHA EMISIÓN']);L.ent=iso(l['FEC. ENTREGA']);L.chain=T(l['CANAL']).toUpperCase()||(L.order&&L.order.chain)||'SIN CANAL';L.det=T(l['DETALLE CANAL']);L.fact=T(l['FACTURA']);if(L.order){L.order.lines.push(L);if(L.fac&&(!L.order.fac||L.fac<L.order.fac))L.order.fac=L.fac}return L;
+  });
+  return{orders,lines};
+}
+
+/* ---------- filtros ---------- */
+const bd=o=>F.base==='emi'?o.emi:F.base==='ent'?o.ent:o.fac;
+function okOrder(o){
+  const d=bd(o);
+  if(F.from&&(!d||d<F.from))return false;
+  if(F.to&&(!d||d>F.to))return false;
+  if(F.chains.size&&!F.chains.has(o.chain))return false;
+  if(F.estado&&o.est!==F.estado)return false;
+  if(F.q&&!o.oc.includes(F.q.trim()))return false;
+  if(F.skus.size&&!o.lines.some(l=>F.skus.has(l.sku)))return false;
+  return true;
+}
+const orders=()=>DATA.orders.filter(okOrder);
+const bdl=l=>F.base==='ent'?l.ent:l.fac;
+function okLine(l){
+  const d=bdl(l);
+  if(F.from&&(!d||d<F.from))return false;
+  if(F.to&&(!d||d>F.to))return false;
+  if(F.chains.size&&!F.chains.has(l.chain))return false;
+  if(F.skus.size&&!F.skus.has(l.sku))return false;
+  if(F.q&&!l.oc.includes(F.q.trim()))return false;
+  return true;
+}
+const mLines=()=>DATA.lines.filter(okLine);
+const lines=()=>DATA.lines.filter(l=>l.order&&okOrder(l.order)&&(!F.skus.size||F.skus.has(l.sku)));
+const sum=(a,f)=>a.reduce((s,x)=>s+(f(x)||0),0);
+const ym=d=>d?d.slice(0,7):'';
+const monthLbl=k=>{const[y,m]=k.split('-');return MES[+m-1]+' '+y.slice(2)};
+const dshort=d=>d?`${d.slice(8)}/${d.slice(5,7)}/${d.slice(2,4)}`:'—';
+const estPill=o=>o.est==='ok'?'<span class="pill ok">Atendida</span>':o.est==='bad'?`<span class="pill bad">Falta de stock</span><span class="sub">${esc(o.at)}</span>`:o.est==='prog'?'<span class="pill prog">Proyectada</span>':`<span class="pill off">${esc(o.at||'—')}</span>`;
+const pagoPill=o=>o.pago==='PAGADO'?'<span class="pill ok">Pagado</span>':o.pago==='VENCIDO'?'<span class="pill warn">Vencido</span>':o.pago==='PENDIENTE'?'<span class="pill prog">Por cobrar</span>':'<span class="pill off">—</span>';
+
+
+/* ---------- márgenes ---------- */
+const pct=(a,b)=>b?(a/b*100):0, fp=n=>n.toLocaleString('es-ES',{useGrouping:'always',minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const mAgg=ls=>({q:sum(ls,l=>l.qty),cp:sum(ls,l=>l.cp*l.qty),ft:sum(ls,l=>l.ft),mx:sum(ls,l=>l.mx)});
+function renderMargen(){
+  const box=$('viewMargen'), ls=mLines();
+  if(!DATA.orders.length){box.innerHTML=`<div class="card empty"><b>Aún no hay datos</b>${esc(meta.msg)}</div>`;return}
+  if(!ls.length){box.innerHTML='<div class="card empty"><b>No hay líneas con estos filtros</b>Los márgenes salen de la hoja FACTURA.</div>';return}
+  const A=mAgg(ls), BL={ent:'entrega',fac:'emisión de la factura'}[F.base==='ent'?'ent':'fac'];
+  let h=`<p class="srcmsg" style="margin:0">Fechas filtradas por: <b>${BL}</b>${F.from||F.to?` · ${dshort(F.from)} a ${dshort(F.to)}`:' · sin rango de fechas'}. Cámbialo en «Fecha según».</p><section class="kpis">`+
+    kpi('Costo del producto',fmt(A.cp,2),`${fint(A.q)} unidades · ${ls.length} líneas`)+
+    kpi('Facturación total',fmt(A.ft,2),`${new Set(ls.map(l=>l.oc)).size} OS facturadas`,'main')+
+    kpi('Margen retail',fmt(A.mx,2),`${fp(pct(A.mx,A.ft))} de la facturación total`)+`</section>`;
+  const cs=[...new Set(ls.map(l=>l.chain))];
+  const rows=cs.map(c=>({c,...mAgg(ls.filter(l=>l.chain===c))})).sort((a,b)=>b.ft-a.ft);
+  const mxm=Math.max(...rows.map(r=>r.mx))||1;
+  const row=(r,b)=>`<tr><td>${b?'<b>Total</b>':`<b>${esc(r.c)}</b>`}</td><td class="r num">${fint(r.q)}</td><td class="r num">${fmt(r.cp,2)}</td><td class="r num">${fmt(r.ft,2)}</td><td><div class="barcell">${b?'':`<div class="bar" style="width:${Math.max(2,r.mx/mxm*110)}px"></div>`}<span class="num"><b>${fmt(r.mx,2)}</b></span></div></td><td class="r num">${fp(pct(r.mx,r.ft))}</td></tr>`;
+  h+=`<section class="card"><h2>Por cadena</h2><div class="tablewrap"><table><thead><tr><th>Cadena</th><th class="r">Unid.</th><th class="r">Costo del producto</th><th class="r">Facturación total</th><th>Margen retail</th><th class="r">% s/ facturación</th></tr></thead><tbody>`+rows.map(r=>row(r)).join('')+row({c:'Total',...A},1)+`</tbody></table></div></section>`;
+  h+=`<section class="card"><h2>Por cadena y SKU</h2><div class="tablewrap"><table><thead><tr><th>SKU</th><th class="r">Unid.</th><th class="r">Costo producto / u</th><th class="r">Precio venta / u</th><th class="r">Facturación total</th><th class="r">Margen retail</th><th class="r">% s/ facturación</th></tr></thead><tbody>`;
+  for(const r of rows){
+    h+=`<tr class="grp"><td colspan="7">${esc(r.c)}</td></tr>`;
+    [...new Set(ls.filter(l=>l.chain===r.c).map(l=>l.sku))].map(x=>({x,...mAgg(ls.filter(l=>l.chain===r.c&&l.sku===x))})).sort((a,b)=>b.ft-a.ft).forEach(a=>{
+      const u=a.q||1;
+      h+=`<tr><td>${esc(a.x)}</td><td class="r num">${fint(a.q)}</td><td class="r num">${fmt(a.cp/u,2)}</td><td class="r num">${fmt(a.ft/u,2)}</td><td class="r num">${fmt(a.ft,2)}</td><td class="r num"><b>${fmt(a.mx,2)}</b></td><td class="r num">${fp(pct(a.mx,a.ft))}</td></tr>`})
+  }
+  h+=`</tbody></table></div></section>`;
+  box.innerHTML=h;
+}
+
+/* ---------- render ---------- */
+function renderControls(){
+  const M=page==='margen', all=M?DATA.lines:DATA.orders, bdx=M?bdl:bd, dates=all.map(bdx).filter(Boolean).sort();
+  const months=[...new Set(all.map(o=>ym(bdx(o))).filter(Boolean))].sort();
+  $('fBase').querySelector('[value=emi]').disabled=M;$('fEstado').disabled=M;
+  $('months').innerHTML=months.map(m=>`<button class="chip" type="button" data-m="${m}" aria-pressed="${F.from.slice(0,7)===m&&F.to.slice(0,7)===m}">${monthLbl(m)}</button>`).join('');
+  const chains=[...new Set(all.map(o=>o.chain))].sort();
+  $('chains').innerHTML=chains.map(c=>`<button class="chip" type="button" data-c="${esc(c)}" aria-pressed="${F.chains.has(c)}">${esc(c)}</button>`).join('');
+  const skus=[...new Set(DATA.lines.map(l=>l.sku))].sort();
+  $('skuPop').innerHTML=skus.length?skus.map(s=>`<label><input type="checkbox" data-s="${esc(s)}" ${F.skus.has(s)?'checked':''}><span>${esc(s)}</span></label>`).join(''):'<div class="empty">Sin SKUs cargados</div>';
+  $('skuSum').textContent=F.skus.size?`${F.skus.size} SKU${F.skus.size>1?'s':''} elegido${F.skus.size>1?'s':''}`:'Todos los SKUs';
+  $('fFrom').min=$('fTo').min=dates[0]||'';$('fFrom').max=$('fTo').max=dates[dates.length-1]||'';
+}
+function kpi(l,v,s,c=''){return`<div class="kpi ${c}"><div class="l">${l}</div><div class="v num">${v}</div><div class="s">${s}</div></div>`}
+function renderKpis(os){
+  const g=e=>os.filter(o=>o.est===e), at=g('ok'), no=g('bad'), pr=g('prog');
+  const cob=at.filter(o=>o.pago==='VENCIDO'||o.pago==='PENDIENTE'), ven=at.filter(o=>o.pago==='VENCIDO');
+  $('kpis').innerHTML=
+    kpi('OS emitidas',fint(os.length),`${fint(sum(os,o=>o.units))} unidades`)+
+    kpi('Venta total OS',fmt(sum(os,o=>o.monto)),'monto de todas las OS del consolidado','main')+
+    kpi('Venta atendida',fmt(sum(at,o=>o.monto)),`${at.length} OS · ${os.length?Math.round(at.length/os.length*100):0}% del total`)+
+    kpi('OS con falta de stock',fmt(sum(no,o=>o.monto)),`${no.length} OS · monto de la OS completa`,no.length?'bad':'')+
+    kpi('Proyectada',fmt(sum(pr,o=>o.monto)),`${pr.length} OS proyectadas`)+
+    kpi('Por cobrar',fmt(sum(cob,o=>o.monto)),`${fmt(sum(ven,o=>o.monto))} vencido`);
+}
+function renderChains(os){
+  const cs=[...new Set(os.map(o=>o.chain))];
+  const rows=cs.map(c=>{const a=os.filter(o=>o.chain===c);return{c,n:a.length,ok:a.filter(o=>o.est==='ok').length,bad:a.filter(o=>o.est==='bad').length,prog:a.filter(o=>o.est==='prog').length,v:sum(a,o=>o.monto),vb:sum(a.filter(o=>o.est==='bad'),o=>o.monto)}}).sort((a,b)=>b.v-a.v);
+  if(!rows.length){$('chainTbl').innerHTML='<div class="empty">Sin OS con estos filtros</div>';return}
+  const mx=Math.max(...rows.map(r=>r.v))||1;
+  $('chainTbl').innerHTML=`<table><thead><tr><th>Cadena</th><th class="r">OS</th><th class="r">Atend.</th><th class="r">Falta stock</th><th class="r">Proyect.</th><th>Venta total</th><th class="r">Monto falta stock</th></tr></thead><tbody>`+
+   rows.map(r=>`<tr class="click" data-c="${esc(r.c)}"><td><b>${esc(r.c)}</b></td><td class="r num">${r.n}</td><td class="r num">${r.ok}</td><td class="r num" style="${r.bad?'color:var(--bad);font-weight:700':''}">${r.bad}</td><td class="r num">${r.prog}</td>
+   <td><div class="barcell"><div class="bar" style="width:${Math.max(2,r.v/mx*110)}px"></div><span class="num">${fmt(r.v)}</span></div></td><td class="r num" style="${r.vb?'color:var(--bad);font-weight:700':''}">${r.vb?fmt(r.vb):'—'}</td></tr>`).join('')+
+   `<tr><td><b>Total</b></td><td class="r num"><b>${os.length}</b></td><td class="r num"><b>${sum(rows,r=>r.ok)}</b></td><td class="r num"><b>${sum(rows,r=>r.bad)}</b></td><td class="r num"><b>${sum(rows,r=>r.prog)}</b></td><td class="num"><b>${fmt(sum(rows,r=>r.v))}</b></td><td class="r num"><b>${fmt(sum(rows,r=>r.vb))}</b></td></tr></tbody></table>`;
+}
+function renderMonths(os){
+  const ms=[...new Set(os.map(o=>ym(o.emi)).filter(Boolean))].sort();
+  if(!ms.length){$('monthChart').innerHTML='<div class="empty">Sin datos</div>';return}
+  const d=ms.map(m=>{const a=os.filter(o=>ym(o.emi)===m);return{m,ok:sum(a.filter(o=>o.est==='ok'),o=>o.monto),pr:sum(a.filter(o=>o.est==='prog'),o=>o.monto),bad:sum(a.filter(o=>o.est==='bad'),o=>o.monto)}});
+  const mx=Math.max(...d.map(x=>x.ok+x.pr+x.bad))||1, W=420,H=210,L=44,B=24,T0=10,ph=H-B-T0,bw=Math.min(54,(W-L)/d.length*.6),step=(W-L)/d.length;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Venta por mes de emisión">`;
+  [0,.5,1].forEach(t=>{const y=T0+ph*(1-t);s+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${t?Math.round(mx*t/1000)+'k':'0'}</text>`});
+  d.forEach((x,i)=>{const cx=L+step*i+step/2;let y=T0+ph;
+    [['ok','var(--palm)'],['pr','var(--sun)'],['bad','var(--bad)']].forEach(([k,c])=>{const h=x[k]/mx*ph;if(h>0){y-=h;s+=`<rect x="${cx-bw/2}" y="${y}" width="${bw}" height="${h}" fill="${c}"/>`}});
+    s+=`<text x="${cx}" y="${H-7}" text-anchor="middle">${monthLbl(x.m)}</text><text x="${cx}" y="${y-4}" text-anchor="middle">${fmt(x.ok+x.pr+x.bad)}</text>`});
+  $('monthChart').innerHTML=s+'</svg>';
+}
+const SORTS={oc:o=>o.oc,chain:o=>o.chain,emi:o=>o.emi||'',ent:o=>o.ent||'',est:o=>o.est,units:o=>o.units||0,monto:o=>o.monto};
+function th(k,l,r){return`<th class="sortable ${r?'r':''}" data-k="${k}">${l}${sort.k===k?(sort.d>0?' ▲':' ▼'):''}</th>`}
+function renderOs(os){
+  if(!os.length)return`<div class="empty"><b>No hay OS con estos filtros</b>Cambia el rango de fechas, la cadena o el SKU.</div>`;
+  const f=SORTS[sort.k];
+  const a=[...os].sort((x,y)=>(f(x)>f(y)?1:f(x)<f(y)?-1:0)*sort.d);
+  let h=F.skus.size?`<div class="note" style="margin-bottom:10px">Con filtro de SKU solo se ven las OS que ya tienen detalle de SKU (facturadas).</div>`:'';
+  h+=`<div class="tablewrap"><table><thead><tr>${th('oc','N° O/C')}${th('chain','Cadena')}${th('emi','Emisión')}${th('ent','Entrega')}${th('est','Estado')}${th('units','Unid.',1)}${th('monto','Venta',1)}<th>Factura</th><th>Cobro</th></tr></thead><tbody>`;
+  for(const o of a){
+    const open=expanded.has(o.oc), has=o.lines.length;
+    h+=`<tr class="click ${o.est==='bad'?'bad':''}" data-oc="${esc(o.oc)}"><td><b class="num">${has?(open?'▾ ':'▸ '):''}${esc(o.oc)}</b></td><td>${esc(o.chain)}<span class="sub">${esc(o.det)}</span></td><td class="num">${dshort(o.emi)}</td><td class="num">${dshort(o.ent)}</td><td>${estPill(o)}</td><td class="r num">${o.units==null?'—':fint(o.units)}</td><td class="r num"><b>${fmt(o.monto,2)}</b></td><td class="num">${esc(o.fact)||'<span class="sub">por emitir</span>'}</td><td>${pagoPill(o)}</td></tr>`;
+    if(open)for(const l of o.lines)h+=`<tr class="child"><td colspan="5">${esc(l.sku)}</td><td class="r num">${fint(l.qty)}</td><td class="r num">${fmt(l.venta,2)}</td><td colspan="2" class="num">${l.pv!=null?fmt(l.pv,2)+' c/IGV x und.':''}</td></tr>`;
+  }
+  return h+'</tbody></table></div>';
+}
+function renderSku(){
+  const ls=lines(), nOs=orders().length, sinDet=orders().filter(o=>!o.lines.length).length;
+  if(!ls.length)return`<div class="empty"><b>No hay SKUs con estos filtros</b>El detalle existe solo para OS facturadas.</div>`;
+  const by={};ls.forEach(l=>{const b=by[l.sku]||(by[l.sku]={sku:l.sku,q:0,v:0,oc:new Set()});b.q+=l.qty;b.v+=l.venta;b.oc.add(l.oc)});
+  const rows=Object.values(by).sort((a,b)=>b.v-a.v), mx=rows[0].v||1;
+  let h=`<div class="note" style="margin-bottom:12px">${sinDet} de ${nOs} OS filtradas aún no tienen detalle de SKU (en curso, desestimadas o con factura por emitir).</div>
+  <h3 style="font-size:1rem;margin:4px 0 8px">SKUs vendidos</h3><div class="tablewrap"><table><thead><tr><th>SKU</th><th class="r">Unidades</th><th class="r">N° OS</th><th class="r">Precio prom. s/IGV</th><th>Venta</th></tr></thead><tbody>`;
+  rows.forEach(r=>h+=`<tr><td>${esc(r.sku)}</td><td class="r num">${fint(r.q)}</td><td class="r num">${r.oc.size}</td><td class="r num">${fmt(r.q?r.v/r.q:0,2)}</td><td><div class="barcell"><div class="bar" style="width:${Math.max(2,r.v/mx*110)}px"></div><span class="num">${fmt(r.v)}</span></div></td></tr>`);
+  h+=`<tr><td><b>Total</b></td><td class="r num"><b>${fint(sum(rows,r=>r.q))}</b></td><td></td><td></td><td class="num"><b>${fmt(sum(rows,r=>r.v))}</b></td></tr></tbody></table></div>
+  <h3 style="font-size:1rem;margin:20px 0 8px">Detalle línea por línea</h3><div class="tablewrap"><table><thead><tr><th>N° O/C</th><th>Cadena</th><th>Entrega</th><th>SKU</th><th class="r">Cant.</th><th class="r">Precio c/IGV</th><th class="r">Venta s/IGV</th></tr></thead><tbody>`;
+  [...ls].sort((a,b)=>(b.order.ent||'').localeCompare(a.order.ent||'')).forEach(l=>h+=`<tr><td class="num"><b>${esc(l.oc)}</b></td><td>${esc(l.order.chain)}<span class="sub">${esc(l.order.det)}</span></td><td class="num">${dshort(l.order.ent)}</td><td>${esc(l.sku)}</td><td class="r num">${fint(l.qty)}</td><td class="r num">${l.pv!=null?fmt(l.pv,2):'—'}</td><td class="r num">${fmt(l.venta,2)}</td></tr>`);
+  return h+'</tbody></table></div>';
+}
+function renderQuality(){
+  const q=[];
+  DATA.orders.forEach(o=>{
+    if(o.emi&&o.ent&&o.emi>o.ent)q.push(`O/C ${o.oc}: la emisión (${dshort(o.emi)}) es posterior a la entrega (${dshort(o.ent)}). Revisar la fecha.`);
+    if(o.units==null&&o.est!=='bad'||o.units==null)q.push(`O/C ${o.oc}: no tiene unidades en el consolidado.`);
+    if(o.est==='ok'&&o.fact&&!o.lines.length)q.push(`O/C ${o.oc}: facturada pero sin detalle en la hoja FACTURA.`);
+    if(o.lines.length){const v=sum(o.lines,l=>l.venta),u=sum(o.lines,l=>l.qty);
+      if(Math.abs(v-o.monto)>1)q.push(`O/C ${o.oc}: los SKUs suman ${fmt(v,2)} y la OS ${fmt(o.monto,2)} (${fint(u)} vs ${fint(o.units)} unidades). Falta una línea o hay error de digitación.`)}
+  });
+  DATA.lines.filter(l=>!l.order).forEach(l=>q.push(`O/C ${l.oc} en FACTURA no existe en CONSOLIDADO.`));
+  $('dq').innerHTML=`<summary>Calidad de datos · ${q.length} alerta${q.length===1?'':'s'}</summary>${q.length?'<ul>'+q.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>':'<p class="srcmsg">Sin diferencias entre el consolidado y el detalle.</p>'}`;
+}
+function render(){
+  renderControls();
+  $('viewVentas').hidden=page!=='ventas';$('viewMargen').hidden=page!=='margen';
+  document.querySelectorAll('#nav [data-p]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===page));
+  if(page==='margen'){renderMargen();$('dot').className='dot '+meta.state;$('srcmsg').textContent=meta.msg;return}
+  const os=orders();
+  if(!DATA.orders.length){
+    $('kpis').innerHTML='';$('chainTbl').innerHTML='<div class="empty">Sin datos</div>';$('monthChart').innerHTML='<div class="empty">Sin datos</div>';
+    $('panel').innerHTML=`<div class="empty"><b>Aún no hay datos</b>${esc(meta.msg)}. Pulsa Actualizar o carga el .xlsx manualmente.</div>`;$('dq').innerHTML='';
+  }else{
+    renderKpis(os);renderChains(os);renderMonths(os);
+    $('panel').innerHTML=view==='os'?renderOs(os):renderSku();renderQuality();
+  }
+  $('dot').className='dot '+meta.state;
+  $('srcmsg').textContent=meta.msg;
+  $('tabOs').setAttribute('aria-selected',view==='os');$('tabSku').setAttribute('aria-selected',view==='sku');
+}
+
+/* ---------- carga ---------- */
+function load(txtOrSheets,at,msg){
+  const sheets=typeof txtOrSheets==='string'?parseText(txtOrSheets):txtOrSheets;
+  const d=build(sheets);
+  if(!d.orders.length)throw new Error('No se encontró la hoja CONSOLIDADO con columna "Nro O/C".');
+  DATA=d;meta={at,state:'live',msg:typeof msg==='function'?msg():msg};render();
+}
+const hhmm=t=>new Date(t).toLocaleString('es-ES',{useGrouping:'always',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+function extractText(res){
+  let p=res&&res.payload;
+  if(typeof p==='string')return p;
+  const acc=[];(function w(x){if(typeof x==='string')acc.push(x);else if(Array.isArray(x))x.forEach(w);else if(x&&typeof x==='object')Object.values(x).forEach(w)})(p!=null?p:(res&&res.content));
+  return acc.sort((a,b)=>b.length-a.length)[0]||'';
+}
+const ERR={needs_reauth:'Reconecta Microsoft 365 en Configuración → Conectores de claude.ai.',server_not_connected:'Agrega el conector Microsoft 365 en Configuración → Conectores de claude.ai.',not_in_manifest:'El acceso a Microsoft 365 fue rechazado para esta página.',consent_required:'Permite el acceso a Microsoft 365 para actualizar.',tool_error:'Microsoft 365 no pudo leer el archivo (revisa que tengas acceso).',blocked_by_policy:'Tu organización bloquea este conector.'};
+function onResult(res){
+  try{
+    const txt=extractText(res);
+    load(txt,(res.cache&&res.cache.storedAt)||Date.now(),()=>`Fuente: ${SRC.name} · ${DATA.orders.length} OS y ${DATA.lines.length} líneas de SKU · actualizado ${hhmm((res.cache&&res.cache.storedAt)||Date.now())}`);
+    try{localStorage.setItem('palmera-cache-v2',JSON.stringify({t:Date.now(),txt}))}catch(e){}
+  }catch(e){meta={at:null,state:'err',msg:'No se pudo interpretar el Excel: '+e.message};render()}
+}
+function onError(e){
+  const m=ERR[e.code]||`No se pudo actualizar (${e.code||'error'}).`;
+  meta={at:meta.at,state:'err',msg:DATA.orders.length?m+' Se muestran los últimos datos cargados.':m};render();
+}
+let mcp=null, unwatch=null;
+async function connect(){
+  try{mcp=await window.claude.use('mcp')}catch(e){mcp=null}
+  if(!mcp){meta={at:null,state:'err',msg:'La conexión con Excel no está disponible aquí. Usa Cargar .xlsx.'};render();return}
+  unwatch=mcp.watchTool(SRC.server,SRC.tool,{uri:SRC.uri},ev=>ev.type==='data'?onResult(ev.result):onError(ev.error),{refetchInterval:300000});
+}
+$('btnRefresh').onclick=async()=>{
+  if(!mcp){return connect()}
+  meta.state='load';meta.msg='Actualizando…';render();
+  try{onResult(await mcp.callTool(SRC.server,SRC.tool,{uri:SRC.uri},{cache:{refresh:true,staleTime:0}}))}catch(e){onError(e)}
+};
+$('btnUpload').onclick=()=>$('file').click();
+$('file').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+    const sh={};wb.SheetNames.forEach(n=>sh[n]=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''}));
+    load(sh,Date.now(),`Archivo local: ${f.name} · cargado ${hhmm(Date.now())}`);
+  }catch(err){meta={at:null,state:'err',msg:'No se pudo leer el archivo: '+err.message};render()}
+  e.target.value='';
+};
+$('btnCsv').onclick=async()=>{
+  const dl=await window.claude.use('downloads').catch(()=>null);
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  let rows,name;
+  if(page==='margen'){rows=[['Cadena','SKU','O/C','Factura','Cantidad','Costo producto u','Costo producto total','Facturacion total','Margen retail'],...mLines().map(l=>[l.chain,l.sku,l.oc,l.fact,l.qty,l.cp,(l.cp*l.qty).toFixed(2),l.ft.toFixed(2),l.mx.toFixed(2)])];name='margenes-palmera.csv'}
+  else if(view==='os'){rows=[['O/C','Cadena','Detalle','Emision','Entrega','Estado','Unidades','Venta sin IGV','Factura','Cobro'],...orders().map(o=>[o.oc,o.chain,o.det,o.emi,o.ent,o.at,o.units,o.monto,o.fact,o.pago])];name='os-palmera.csv'}
+  else{rows=[['O/C','Cadena','Entrega','SKU','Cantidad','Precio con IGV','Venta sin IGV'],...lines().map(l=>[l.oc,l.order.chain,l.order.ent,l.sku,l.qty,l.pv,l.venta.toFixed(2)])];name='skus-palmera.csv'}
+  const data='﻿'+rows.map(r=>r.map(q).join(',')).join('\n');
+  if(!dl){meta.msg='La descarga no está disponible en esta vista.';render();return}
+  try{await dl.save({filename:name,data})}catch(e){}
+};
+
+/* ---------- eventos ---------- */
+$('fFrom').onchange=e=>{F.from=e.target.value;render()};
+$('fTo').onchange=e=>{F.to=e.target.value;render()};
+$('fBase').onchange=e=>{F.base=e.target.value;render()};
+$('fEstado').onchange=e=>{F.estado=e.target.value;render()};
+$('fQ').oninput=e=>{F.q=e.target.value;render()};
+$('months').onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;const m=b.dataset.m;
+  if(F.from.slice(0,7)===m&&F.to.slice(0,7)===m){F.from=F.to=''}else{const[y,mo]=m.split('-');F.from=m+'-01';F.to=m+'-'+String(new Date(+y,+mo,0).getDate()).padStart(2,'0')}
+  $('fFrom').value=F.from;$('fTo').value=F.to;render()};
+const togChain=c=>{F.chains.has(c)?F.chains.delete(c):F.chains.add(c);render()};
+$('chains').onclick=e=>{const b=e.target.closest('[data-c]');if(b)togChain(b.dataset.c)};
+$('chainTbl').onclick=e=>{const r=e.target.closest('[data-c]');if(r)togChain(r.dataset.c)};
+$('skuPop').onchange=e=>{const s=e.target.dataset.s;if(s==null)return;e.target.checked?F.skus.add(s):F.skus.delete(s);render();$('skuMs').open=true};
+$('btnClear').onclick=()=>{F={from:'',to:'',base:F.base,chains:new Set(),skus:new Set(),estado:'',q:''};['fFrom','fTo','fQ','fEstado'].forEach(i=>$(i).value='');render()};
+$('nav').hidden=!SHOW_VENTAS;$('fBase').value=F.base;
+$('nav').onclick=e=>{const b=e.target.closest('[data-p]');if(b){page=b.dataset.p;if(page==='margen'&&F.base==='emi'){F.base='fac';$('fBase').value='fac'}render()}};
+$('tabOs').onclick=()=>{view='os';render()};$('tabSku').onclick=()=>{view='sku';render()};
+$('panel').onclick=e=>{
+  const t=e.target.closest('th[data-k]');
+  if(t){sort=sort.k===t.dataset.k?{k:sort.k,d:-sort.d}:{k:t.dataset.k,d:1};return render()}
+  const r=e.target.closest('tr[data-oc]');
+  if(r){const oc=r.dataset.oc;expanded.has(oc)?expanded.delete(oc):expanded.add(oc);render()}
+};
+
+/* ---------- inicio ---------- */
+try{const c=JSON.parse(localStorage.getItem('palmera-cache-v2')||'null');if(c&&c.txt)load(c.txt,c.t,`Últimos datos guardados · ${hhmm(c.t)} · conectando…`)}catch(e){}
+render();
+connect();
+</script>
