@@ -145,6 +145,7 @@ tr.grp td{background:var(--bg);font-weight:700;border-bottom:2px solid var(--pal
       <button class="btn" id="btnUpload" type="button">Cargar .xlsx</button>
       <button class="btn" id="btnCsv" type="button">Exportar CSV</button>
       <input type="file" id="file" accept=".xlsx" hidden>
+      <form id="keyForm" hidden style="display:flex;gap:6px"><input id="keyIn" type="password" placeholder="Clave de acceso" autocomplete="current-password" aria-label="Clave de acceso" style="border:1px solid #555;background:transparent;color:inherit;border-radius:5px;padding:6px 10px"><button class="btn primary" type="submit">Entrar</button></form>
     </div>
   </header>
 
@@ -449,14 +450,31 @@ function onError(e){
   const m=ERR[e.code]||`No se pudo actualizar (${e.code||'error'}).`;
   meta={at:meta.at,state:'err',msg:DATA.orders.length?m+' Se muestran los últimos datos cargados.':m};render();
 }
+
+/* ---------- lectura desde Netlify (fuera de Claude): función serverless que lee el Excel con Microsoft Graph ---------- */
+let webTimer=null, KEY='';
+try{KEY=localStorage.getItem('palmera-key')||''}catch(e){}
+async function pullWeb(){
+  meta.state='load';meta.msg='Actualizando…';render();
+  try{
+    const r=await fetch('/.netlify/functions/data',{headers:{'x-access-key':KEY},cache:'no-store'});
+    if(r.status===401){$('keyForm').hidden=false;meta={at:null,state:'err',msg:KEY?'Clave incorrecta.':'Ingresa la clave de acceso.'};return render()}
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    $('keyForm').hidden=true;
+    load(j.sheets,Date.parse(j.updated)||Date.now(),()=>`Fuente: ${j.name||SRC.name} · ${DATA.orders.length} OS y ${DATA.lines.length} líneas de SKU · actualizado ${hhmm(Date.now())}`);
+  }catch(e){meta={at:meta.at,state:'err',msg:'No se pudo leer el Excel ('+e.message+').'+(DATA.orders.length?' Se muestran los últimos datos cargados.':' Usa Cargar .xlsx.')};render()}
+}
+function startWeb(){pullWeb();clearInterval(webTimer);webTimer=setInterval(pullWeb,300000)}
+$('keyForm').onsubmit=e=>{e.preventDefault();KEY=$('keyIn').value;try{localStorage.setItem('palmera-key',KEY)}catch(err){}pullWeb()};
 let mcp=null, unwatch=null;
 async function connect(){
   try{mcp=await window.claude.use('mcp')}catch(e){mcp=null}
-  if(!mcp){meta={at:null,state:'err',msg:'La conexión con Excel no está disponible aquí. Usa Cargar .xlsx.'};render();return}
+  if(!mcp){return startWeb()}
   unwatch=mcp.watchTool(SRC.server,SRC.tool,{uri:SRC.uri},ev=>ev.type==='data'?onResult(ev.result):onError(ev.error),{refetchInterval:300000});
 }
 $('btnRefresh').onclick=async()=>{
-  if(!mcp){return connect()}
+  if(!mcp){return pullWeb()}
   meta.state='load';meta.msg='Actualizando…';render();
   try{onResult(await mcp.callTool(SRC.server,SRC.tool,{uri:SRC.uri},{cache:{refresh:true,staleTime:0}}))}catch(e){onError(e)}
 };
@@ -471,14 +489,14 @@ $('file').onchange=async e=>{
   e.target.value='';
 };
 $('btnCsv').onclick=async()=>{
-  const dl=await window.claude.use('downloads').catch(()=>null);
+  const dl=await (window.claude?window.claude.use('downloads'):Promise.resolve(null)).catch(()=>null);
   const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
   let rows,name;
   if(page==='margen'){rows=[['Cadena','SKU','O/C','Factura','Cantidad','Costo producto u','Costo producto total','Facturacion total','Margen retail'],...mLines().map(l=>[l.chain,l.sku,l.oc,l.fact,l.qty,l.cp,(l.cp*l.qty).toFixed(2),l.ft.toFixed(2),l.mx.toFixed(2)])];name='margenes-palmera.csv'}
   else if(view==='os'){rows=[['O/C','Cadena','Detalle','Emision','Entrega','Estado','Unidades','Venta sin IGV','Factura','Cobro'],...orders().map(o=>[o.oc,o.chain,o.det,o.emi,o.ent,o.at,o.units,o.monto,o.fact,o.pago])];name='os-palmera.csv'}
   else{rows=[['O/C','Cadena','Entrega','SKU','Cantidad','Precio con IGV','Venta sin IGV'],...lines().map(l=>[l.oc,l.order.chain,l.order.ent,l.sku,l.qty,l.pv,l.venta.toFixed(2)])];name='skus-palmera.csv'}
   const data='﻿'+rows.map(r=>r.map(q).join(',')).join('\n');
-  if(!dl){meta.msg='La descarga no está disponible en esta vista.';render();return}
+  if(!dl){const b=new Blob([data],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();return}
   try{await dl.save({filename:name,data})}catch(e){}
 };
 
