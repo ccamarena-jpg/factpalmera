@@ -1,3 +1,5 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>html{color-scheme:light}body{margin:0;font:14px/1.45 system-ui,sans-serif}img{max-width:100%}</style></head><body>
 <title>Tablero Palmera</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -130,6 +132,7 @@ th{color:var(--ink);opacity:.7}
 .neg{color:var(--bad);font-weight:700}
 tr.grp td{background:var(--bg);font-weight:700;border-bottom:2px solid var(--palm)}
 .logo{height:46px;width:auto;flex:none;display:block}
+[hidden]{display:none!important}
 </style>
 
 <div class="wrap">
@@ -196,9 +199,9 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=(n,d=0)=>'S/ '+(n||0).toLocaleString('es-ES',{useGrouping:'always',minimumFractionDigits:d,maximumFractionDigits:d});
 const fint=n=>(n||0).toLocaleString('es-ES',{useGrouping:'always'});
-let DATA={orders:[],lines:[]}, F={from:'',to:'',base:SHOW_VENTAS?'emi':'fac',chains:new Set(),skus:new Set(),estado:'',q:''};
 /* Vista Ventas oculta por ahora: poner SHOW_VENTAS=true para retomarla */
 const SHOW_VENTAS=false;
+let DATA={orders:[],lines:[]}, F={from:'',to:'',base:SHOW_VENTAS?'emi':'fac',chains:new Set(),skus:new Set(),estado:'',q:''};
 let page=SHOW_VENTAS?'ventas':'margen', view='os', sort={k:'emi',d:-1}, expanded=new Set(), meta={at:null,state:'load',msg:'Conectando con Excel…'};
 
 /* ---------- lectura ---------- */
@@ -529,3 +532,5 @@ try{const c=JSON.parse(localStorage.getItem('palmera-cache-v2')||'null');if(c&&c
 render();
 connect();
 </script>
+
+</body></html>
