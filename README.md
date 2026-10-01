@@ -21,7 +21,7 @@ Si la función no está configurada, el botón **Cargar .xlsx** sigue funcionand
 | `TENANT_ID` | Id. de directorio (inquilino) |
 | `CLIENT_ID` | Id. de aplicación (cliente) |
 | `CLIENT_SECRET` | Valor del secreto |
-| `ACCESS_KEY` | Clave que pedirá el tablero al abrirlo |
+| `ACCESS_KEY` | Opcional. Si se define, el tablero pide esta clave al abrirlo. Sin ella, cualquiera con la dirección del sitio puede ver los datos |
 | `DRIVE_ID`, `ITEM_ID`, `FILE_NAME` | Opcionales. Por defecto apuntan a `Facturación_Palmera_SEP.xlsx` |
 
 5. Netlify > Deploys > Trigger deploy.

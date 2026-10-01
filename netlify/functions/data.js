@@ -56,11 +56,14 @@ async function readSheet(token, name) {
 }
 
 exports.handler = async (event) => {
-  const need = ["TENANT_ID", "CLIENT_ID", "CLIENT_SECRET", "ACCESS_KEY"].filter((k) => !process.env[k]);
+  const need = ["TENANT_ID", "CLIENT_ID", "CLIENT_SECRET"].filter((k) => !process.env[k]);
   if (need.length) return json(500, { error: "Faltan variables de entorno: " + need.join(", ") });
 
-  const key = event.headers["x-access-key"] || "";
-  if (!sameKey(key, process.env.ACCESS_KEY)) return json(401, { error: "clave incorrecta" });
+  // ACCESS_KEY es opcional: si no está definida, la función responde sin pedir clave.
+  if (process.env.ACCESS_KEY) {
+    const key = event.headers["x-access-key"] || "";
+    if (!sameKey(key, process.env.ACCESS_KEY)) return json(401, { error: "clave incorrecta" });
+  }
 
   try {
     const token = await getToken();
