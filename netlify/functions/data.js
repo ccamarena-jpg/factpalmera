@@ -1,7 +1,8 @@
 // Lee el Excel de facturación de Palmera en SharePoint/OneDrive con Microsoft Graph
 // (credenciales de aplicación) y devuelve la hoja FACTURA como texto,
-// con el mismo formato que muestra Excel (fechas dd/mm/aaaa, montos con coma decimal).
+// con las fechas en dd/mm/aaaa y los montos como números.
 const crypto = require("crypto");
+const XLSX = require("xlsx");
 
 const DRIVE_ID = process.env.DRIVE_ID || "b!ftpx1PHMU02Xyd_BvRi5gZ4jKtzFMjZHt1vZTICVWd0sPgcGYMRfTZopqpx_5vTB";
 // Se direcciona por ruta (no por id) para que siga funcionando si el archivo se vuelve a subir o se reemplaza.
@@ -51,14 +52,35 @@ async function getToken() {
   return (await r.json()).access_token;
 }
 
-async function readSheet(token, name) {
+// La API de libros de Excel de Graph (workbook) rechaza el token de aplicación en OneDrive
+// ("Could not obtain a WAC access token"), así que se descarga el archivo y se lee aquí.
+async function download(token) {
   const base = ITEM_ID
     ? `items/${ITEM_ID}`
     : `root:/${FILE_PATH.split("/").map(encodeURIComponent).join("/")}:`;
-  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/${base}/workbook/worksheets('${encodeURIComponent(name)}')/usedRange?$select=text`;
-  const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
-  if (!r.ok) throw new Error(`hoja ${name} ${r.status}: ${await detail(r)}`);
-  return (await r.json()).text;
+  const r = await fetch(`https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/${base}/content`, {
+    headers: { authorization: `Bearer ${token}` },
+    redirect: "follow",
+  });
+  if (!r.ok) throw new Error(`archivo ${r.status}: ${await detail(r)}`);
+  return Buffer.from(await r.arrayBuffer());
+}
+
+const pad = (n) => String(n).padStart(2, "0");
+// Fechas como dd/mm/aaaa (igual que se ven en Excel); el resto de celdas se envía con su valor.
+function cell(v) {
+  if (v instanceof Date) {
+    const d = new Date(v.getTime() + 12 * 36e5);
+    return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+  }
+  return v;
+}
+
+function readSheet(wb, name) {
+  const key = wb.SheetNames.find((n) => n.trim().toUpperCase() === name);
+  if (!key) throw new Error(`no existe la hoja ${name}`);
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[key], { header: 1, raw: true, defval: "" });
+  return rows.map((r) => r.map(cell));
 }
 
 exports.handler = async (event) => {
@@ -73,9 +95,9 @@ exports.handler = async (event) => {
 
   try {
     const token = await getToken();
-    const parts = await Promise.all(SHEETS.map((n) => readSheet(token, n)));
+    const wb = XLSX.read(await download(token), { type: "buffer", cellDates: true });
     const sheets = {};
-    SHEETS.forEach((n, i) => (sheets[n] = parts[i]));
+    SHEETS.forEach((n) => (sheets[n] = readSheet(wb, n)));
     return json(200, { name: FILE_NAME, updated: new Date().toISOString(), sheets });
   } catch (e) {
     return json(502, { error: String(e.message || e) });

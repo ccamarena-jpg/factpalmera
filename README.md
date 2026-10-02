@@ -6,7 +6,7 @@ La vista Ventas está oculta; se reactiva con `SHOW_VENTAS=true` en el script de
 ## Cómo se actualiza en Netlify
 
 `index.html` llama a la función `netlify/functions/data.js`, que lee las hojas CONSOLIDADO y FACTURA de
-`Facturación_Palmera_SEP.xlsx` con Microsoft Graph. La página vuelve a leer cada 5 minutos y con el botón Actualizar.
+`Facturación_Palmera_SEP.xlsx` con Microsoft Graph (descarga del archivo; la API de libros de Excel no funciona con permisos de aplicación en OneDrive). La página vuelve a leer cada 5 minutos y con el botón Actualizar.
 Si la función no está configurada, el botón **Cargar .xlsx** sigue funcionando.
 
 ### Configuración (una sola vez, la hace TI de Microsoft 365)
