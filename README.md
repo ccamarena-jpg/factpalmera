@@ -22,7 +22,7 @@ Si la función no está configurada, el botón **Cargar .xlsx** sigue funcionand
 | `CLIENT_ID` | Id. de aplicación (cliente) |
 | `CLIENT_SECRET` | Valor del secreto |
 | `ACCESS_KEY` | Opcional. Si se define, el tablero pide esta clave al abrirlo. Sin ella, cualquiera con la dirección del sitio puede ver los datos |
-| `DRIVE_ID`, `ITEM_ID`, `FILE_NAME` | Opcionales. Por defecto apuntan a `Facturación_Palmera_SEP.xlsx` |
+| `DRIVE_ID`, `FILE_PATH`, `ITEM_ID`, `FILE_NAME` | Opcionales. Por defecto leen `MASSIEL/PALMERA/OC/Facturación_Palmera_SEP.xlsx` por ruta, así que no se rompe si el archivo se reemplaza |
 
 5. Netlify > Deploys > Trigger deploy.
 

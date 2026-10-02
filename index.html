@@ -190,7 +190,7 @@ tr.grp td{background:var(--bg);font-weight:700;border-bottom:2px solid var(--pal
 
 <script>
 const SRC={server:'Microsoft 365',tool:'read_resource',name:'Facturación_Palmera_SEP.xlsx',
-  uri:'file:///b!ftpx1PHMU02Xyd_BvRi5gZ4jKtzFMjZHt1vZTICVWd0sPgcGYMRfTZopqpx_5vTB/015HP6ULO5SPMQ35H4ZVCKWQ2QXIQSSAVA'};
+  uri:'file:///b!ftpx1PHMU02Xyd_BvRi5gZ4jKtzFMjZHt1vZTICVWd0sPgcGYMRfTZopqpx_5vTB/MASSIEL/PALMERA/OC/Facturación_Palmera_SEP.xlsx'};
 const IGV=1.18, MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const $=id=>document.getElementById(id);
 /* logo Palmera en blanco, sin fondo (máscara codificada por filas) */
@@ -256,7 +256,7 @@ function build(sheets){
     const oc=T(l['NRO O/C']),tot=num(l['TOTAL + IGV'])||0;
     const qty=num(l['CANTIDAD'])||0,pv=num(l['PRECIO DE VENTA']),cp=num(l['COSTO DEL PRODUCTO'])||0,ctt=num(l['COSTO TTA'])||0,mxr=num(l['MARGEN RETAIL']);
     const L={oc,sku:T(l['PRODUCTO']),qty,pv,cp,ctt,mx:mxr!=null?mxr:((pv||0)-ctt)*qty,ft:num(l['FACTURACIÓN TOTAL'])!=null?num(l['FACTURACIÓN TOTAL']):(pv||0)*qty,venta:tot/IGV,order:map.get(oc)||null};
-    L.fac=iso(l['FECHA EMISIÓN']);L.ent=iso(l['FEC. ENTREGA']);L.chain=T(l['CANAL']).toUpperCase()||(L.order&&L.order.chain)||'SIN CANAL';L.det=T(l['DETALLE CANAL']);L.fact=T(l['FACTURA']);if(L.order){L.order.lines.push(L);if(L.fac&&(!L.order.fac||L.fac<L.order.fac))L.order.fac=L.fac}return L;
+    L.fac=iso(l['FECHA EMISIÓN FACTURA']!=null?l['FECHA EMISIÓN FACTURA']:l['FECHA EMISIÓN']);L.ent=iso(l['FEC. ENTREGA']);L.chain=T(l['CANAL']).toUpperCase()||(L.order&&L.order.chain)||'SIN CANAL';L.det=T(l['DETALLE CANAL']);L.fact=T(l['FACTURA']);if(L.order){L.order.lines.push(L);if(L.fac&&(!L.order.fac||L.fac<L.order.fac))L.order.fac=L.fac}return L;
   });
   return{orders,lines};
 }

@@ -4,7 +4,10 @@
 const crypto = require("crypto");
 
 const DRIVE_ID = process.env.DRIVE_ID || "b!ftpx1PHMU02Xyd_BvRi5gZ4jKtzFMjZHt1vZTICVWd0sPgcGYMRfTZopqpx_5vTB";
-const ITEM_ID = process.env.ITEM_ID || "015HP6ULO5SPMQ35H4ZVCKWQ2QXIQSSAVA";
+// Se direcciona por ruta (no por id) para que siga funcionando si el archivo se vuelve a subir o se reemplaza.
+// ITEM_ID es opcional y, si se define, tiene prioridad sobre la ruta.
+const FILE_PATH = process.env.FILE_PATH || "MASSIEL/PALMERA/OC/Facturación_Palmera_SEP.xlsx";
+const ITEM_ID = process.env.ITEM_ID || "";
 const FILE_NAME = process.env.FILE_NAME || "Facturación_Palmera_SEP.xlsx";
 const SHEETS = ["CONSOLIDADO", "FACTURA"];
 
@@ -49,7 +52,10 @@ async function getToken() {
 }
 
 async function readSheet(token, name) {
-  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/items/${ITEM_ID}/workbook/worksheets('${encodeURIComponent(name)}')/usedRange?$select=text`;
+  const base = ITEM_ID
+    ? `items/${ITEM_ID}`
+    : `root:/${FILE_PATH.split("/").map(encodeURIComponent).join("/")}:`;
+  const url = `https://graph.microsoft.com/v1.0/drives/${DRIVE_ID}/${base}/workbook/worksheets('${encodeURIComponent(name)}')/usedRange?$select=text`;
   const r = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
   if (!r.ok) throw new Error(`hoja ${name} ${r.status}: ${await detail(r)}`);
   return (await r.json()).text;
