@@ -299,7 +299,7 @@ const pct=(a,b)=>b?(a/b*100):0, fp=n=>n.toLocaleString('es-ES',{useGrouping:'alw
 const mAgg=ls=>({q:sum(ls,l=>l.qty),cp:sum(ls,l=>l.cp*l.qty),ft:sum(ls,l=>l.ft),mx:sum(ls,l=>l.mx)});
 function renderMargen(){
   const box=$('viewMargen'), ls=mLines();
-  if(!DATA.orders.length){box.innerHTML=`<div class="card empty"><b>Aún no hay datos</b>${esc(meta.msg)}</div>`;return}
+  if(!DATA.lines.length){box.innerHTML=`<div class="card empty"><b>Aún no hay datos</b>${esc(meta.msg)}</div>`;return}
   if(!ls.length){box.innerHTML='<div class="card empty"><b>No hay líneas con estos filtros</b>Los márgenes salen de la hoja FACTURA.</div>';return}
   const A=mAgg(ls), BL={ent:'entrega',fac:'emisión de la factura'}[F.base==='ent'?'ent':'fac'];
   let h=`<p class="srcmsg" style="margin:0">Fechas filtradas por: <b>${BL}</b>${F.from||F.to?` · ${dshort(F.from)} a ${dshort(F.to)}`:' · sin rango de fechas'}. Cámbialo en «Fecha según».</p><section class="kpis">`+
@@ -319,6 +319,10 @@ function renderMargen(){
       h+=`<tr><td>${esc(a.x)}</td><td class="r num">${fint(a.q)}</td><td class="r num">${fmt(a.cp/u,2)}</td><td class="r num">${fmt(a.ft/u,2)}</td><td class="r num">${fmt(a.ft,2)}</td><td class="r num"><b>${fmt(a.mx,2)}</b></td><td class="r num">${fp(pct(a.mx,a.ft))}</td></tr>`})
   }
   h+=`</tbody></table></div></section>`;
+  const fl=[...ls].sort((a,b)=>(b.fac||'').localeCompare(a.fac||'')||a.oc.localeCompare(b.oc));
+  h+=`<section class="card"><h2>Detalle de la hoja FACTURA</h2><div class="tablewrap"><table><thead><tr><th>N° O/C</th><th>Cadena</th><th>Factura</th><th>Emisión factura</th><th>Entrega</th><th>Producto</th><th class="r">Cant.</th><th class="r">Costo producto</th><th class="r">Precio venta</th><th class="r">Facturación total</th><th class="r">Margen retail</th></tr></thead><tbody>`+
+    fl.map(l=>`<tr><td class="num"><b>${esc(l.oc)}</b></td><td>${esc(l.chain)}</td><td class="num">${esc(l.fact)}</td><td class="num">${dshort(l.fac)}</td><td class="num">${dshort(l.ent)}</td><td>${esc(l.sku)}</td><td class="r num">${fint(l.qty)}</td><td class="r num">${fmt(l.cp,2)}</td><td class="r num">${l.pv!=null?fmt(l.pv,2):'—'}</td><td class="r num">${fmt(l.ft,2)}</td><td class="r num"><b>${fmt(l.mx,2)}</b></td></tr>`).join('')+
+    `<tr><td colspan="6"><b>Total</b></td><td class="r num"><b>${fint(A.q)}</b></td><td class="r num"><b>${fmt(A.cp,2)}</b></td><td></td><td class="r num"><b>${fmt(A.ft,2)}</b></td><td class="r num"><b>${fmt(A.mx,2)}</b></td></tr></tbody></table></div></section>`;
   box.innerHTML=h;
 }
 
@@ -415,7 +419,7 @@ function render(){
   document.querySelectorAll('#nav [data-p]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===page));
   if(page==='margen'){renderMargen();$('dot').className='dot '+meta.state;$('srcmsg').textContent=meta.msg;return}
   const os=orders();
-  if(!DATA.orders.length){
+  if(!DATA.lines.length){
     $('kpis').innerHTML='';$('chainTbl').innerHTML='<div class="empty">Sin datos</div>';$('monthChart').innerHTML='<div class="empty">Sin datos</div>';
     $('panel').innerHTML=`<div class="empty"><b>Aún no hay datos</b>${esc(meta.msg)}. Pulsa Actualizar o carga el .xlsx manualmente.</div>`;$('dq').innerHTML='';
   }else{
@@ -431,7 +435,7 @@ function render(){
 function load(txtOrSheets,at,msg){
   const sheets=typeof txtOrSheets==='string'?parseText(txtOrSheets):txtOrSheets;
   const d=build(sheets);
-  if(!d.orders.length)throw new Error('No se encontró la hoja CONSOLIDADO con columna "Nro O/C".');
+  if(!d.lines.length)throw new Error('No se encontró la hoja FACTURA con columna "Nro O/C".');
   DATA=d;meta={at,state:'live',msg:typeof msg==='function'?msg():msg};render();
 }
 const hhmm=t=>new Date(t).toLocaleString('es-ES',{useGrouping:'always',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
@@ -445,13 +449,13 @@ const ERR={needs_reauth:'Reconecta Microsoft 365 en Configuración → Conectore
 function onResult(res){
   try{
     const txt=extractText(res);
-    load(txt,(res.cache&&res.cache.storedAt)||Date.now(),()=>`Fuente: ${SRC.name} · ${DATA.orders.length} OS y ${DATA.lines.length} líneas de SKU · actualizado ${hhmm((res.cache&&res.cache.storedAt)||Date.now())}`);
+    load(txt,(res.cache&&res.cache.storedAt)||Date.now(),()=>`Fuente: ${SRC.name} · ${DATA.lines.length} líneas de la hoja FACTURA · actualizado ${hhmm((res.cache&&res.cache.storedAt)||Date.now())}`);
     try{localStorage.setItem('palmera-cache-v2',JSON.stringify({t:Date.now(),txt}))}catch(e){}
   }catch(e){meta={at:null,state:'err',msg:'No se pudo interpretar el Excel: '+e.message};render()}
 }
 function onError(e){
   const m=ERR[e.code]||`No se pudo actualizar (${e.code||'error'}).`;
-  meta={at:meta.at,state:'err',msg:DATA.orders.length?m+' Se muestran los últimos datos cargados.':m};render();
+  meta={at:meta.at,state:'err',msg:DATA.lines.length?m+' Se muestran los últimos datos cargados.':m};render();
 }
 
 /* ---------- lectura desde Netlify (fuera de Claude): función serverless que lee el Excel con Microsoft Graph ---------- */
@@ -465,8 +469,8 @@ async function pullWeb(){
     if(!r.ok)throw new Error('HTTP '+r.status);
     const j=await r.json();
     $('keyForm').hidden=true;
-    load(j.sheets,Date.parse(j.updated)||Date.now(),()=>`Fuente: ${j.name||SRC.name} · ${DATA.orders.length} OS y ${DATA.lines.length} líneas de SKU · actualizado ${hhmm(Date.now())}`);
-  }catch(e){meta={at:meta.at,state:'err',msg:'No se pudo leer el Excel ('+e.message+').'+(DATA.orders.length?' Se muestran los últimos datos cargados.':' Usa Cargar .xlsx.')};render()}
+    load(j.sheets,Date.parse(j.updated)||Date.now(),()=>`Fuente: ${j.name||SRC.name} · ${DATA.lines.length} líneas de la hoja FACTURA · actualizado ${hhmm(Date.now())}`);
+  }catch(e){meta={at:meta.at,state:'err',msg:'No se pudo leer el Excel ('+e.message+').'+(DATA.lines.length?' Se muestran los últimos datos cargados.':' Usa Cargar .xlsx.')};render()}
 }
 function startWeb(){pullWeb();clearInterval(webTimer);webTimer=setInterval(pullWeb,300000)}
 $('keyForm').onsubmit=e=>{e.preventDefault();KEY=$('keyIn').value;try{localStorage.setItem('palmera-key',KEY)}catch(err){}pullWeb()};

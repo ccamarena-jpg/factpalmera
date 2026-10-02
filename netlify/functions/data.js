@@ -1,5 +1,5 @@
 // Lee el Excel de facturación de Palmera en SharePoint/OneDrive con Microsoft Graph
-// (credenciales de aplicación) y devuelve las hojas CONSOLIDADO y FACTURA como texto,
+// (credenciales de aplicación) y devuelve la hoja FACTURA como texto,
 // con el mismo formato que muestra Excel (fechas dd/mm/aaaa, montos con coma decimal).
 const crypto = require("crypto");
 
@@ -9,7 +9,7 @@ const DRIVE_ID = process.env.DRIVE_ID || "b!ftpx1PHMU02Xyd_BvRi5gZ4jKtzFMjZHt1vZ
 const FILE_PATH = process.env.FILE_PATH || "MASSIEL/PALMERA/OC/Facturación_Palmera_SEP.xlsx";
 const ITEM_ID = process.env.ITEM_ID || "";
 const FILE_NAME = process.env.FILE_NAME || "Facturación_Palmera_SEP.xlsx";
-const SHEETS = ["CONSOLIDADO", "FACTURA"];
+const SHEETS = ["FACTURA"]; // por ahora solo se usa la hoja FACTURA
 
 const json = (status, body, extra = {}) => ({
   statusCode: status,
